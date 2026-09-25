@@ -73,9 +73,14 @@ export function getTimelineDuration(project) {
   return count * hold + Math.max(0, count - 1) * transition;
 }
 
+function detailEntranceDuration(character, settings, hold) {
+  if (settings.detailAnimation === 'name-then-slide') return Math.min(hold, Math.max(0.55, 0.5 + character.details.length * 0.15));
+  return 0.85;
+}
+
 export function sampleTimeline(project, seconds) {
   const characters = project.characters;
-  if (!characters.length) return { camera: { x: SCENE_WIDTH / 2, y: SCENE_HEIGHT / 2, zoom: 1 }, activeIndex: -1, phase: 'empty', progress: 0, detailBorderProgress: 0, turnSeconds: 0 };
+  if (!characters.length) return { camera: { x: SCENE_WIDTH / 2, y: SCENE_HEIGHT / 2, zoom: 1 }, activeIndex: -1, phase: 'empty', progress: 0, detailBorderProgress: 0, detailAnimationElapsed: 0, detailAnimationDuration: 0, turnSeconds: 0 };
 
   const hold = Number(project.settings.displayDuration) || 4;
   const transition = (Number(project.settings.transitionDuration) || 2) / (Number(project.settings.cameraSpeed) || 1);
@@ -84,14 +89,17 @@ export function sampleTimeline(project, seconds) {
 
   for (let index = 0; index < characters.length; index += 1) {
     const current = cameraTarget(characters[index], project.settings.zoomStrength);
+    const entranceDuration = detailEntranceDuration(characters[index], project.settings, hold);
     if (remaining <= hold || index === characters.length - 1) {
-      const holdElapsed = hold - remaining;
+      const holdElapsed = clamp(hold - remaining, 0, hold);
       return {
         camera: current,
         activeIndex: index,
         phase: 'hold',
         progress: duration ? clamp(seconds / duration, 0, 1) : 0,
-        detailBorderProgress: clamp(holdElapsed / 0.85, 0, 1),
+        detailBorderProgress: clamp(holdElapsed / entranceDuration, 0, 1),
+        detailAnimationElapsed: holdElapsed,
+        detailAnimationDuration: entranceDuration,
         turnSeconds: holdElapsed,
       };
     }
@@ -111,6 +119,8 @@ export function sampleTimeline(project, seconds) {
         phase: 'transition',
         progress: duration ? clamp(seconds / duration, 0, 1) : 0,
         detailBorderProgress: 1,
+        detailAnimationElapsed: entranceDuration,
+        detailAnimationDuration: entranceDuration,
         turnSeconds: hold,
       };
     }
@@ -118,7 +128,8 @@ export function sampleTimeline(project, seconds) {
   }
 
   const last = characters.length - 1;
-  return { camera: cameraTarget(characters[last], project.settings.zoomStrength), activeIndex: last, phase: 'hold', progress: 1, detailBorderProgress: 1, turnSeconds: hold };
+  const entranceDuration = detailEntranceDuration(characters[last], project.settings, hold);
+  return { camera: cameraTarget(characters[last], project.settings.zoomStrength), activeIndex: last, phase: 'hold', progress: 1, detailBorderProgress: 1, detailAnimationElapsed: entranceDuration, detailAnimationDuration: entranceDuration, turnSeconds: hold };
 }
 
 function drawCover(ctx, image, x, y, width, height) {
@@ -308,7 +319,7 @@ function traceRoundedRectReveal(ctx, x, y, width, height, radius, progress) {
   ctx.stroke();
 }
 
-function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = 'draw') {
+function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = 'draw', animationElapsed = 0, animationDuration = 0.85) {
   const boxWidth = 460;
   const rowHeights = character.details.map(detailRowHeight);
   const boxHeight = detailBoxHeight(character);
@@ -316,6 +327,9 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
   const boxY = character.position.y - boxHeight - 48;
   ctx.save();
   const easedProgress = smoothstep(clamp(entranceProgress, 0, 1));
+  const sequentialReveal = animationStyle === 'name-then-slide';
+  const panelAlpha = sequentialReveal ? smoothstep(clamp(animationElapsed / Math.min(0.22, animationDuration * 0.3), 0, 1)) : 1;
+  if (sequentialReveal) ctx.globalAlpha *= panelAlpha;
   const centerX = boxX + boxWidth / 2;
   const centerY = boxY + boxHeight / 2;
   if (animationStyle === 'fade') {
@@ -359,8 +373,14 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
   ctx.fillStyle = '#ffffff';
   ctx.font = '700 31px system-ui, sans-serif';
   ctx.textAlign = 'center';
+  if (sequentialReveal) {
+    const nameStart = Math.min(0.08, animationDuration * 0.12);
+    const nameEnd = Math.min(0.3, animationDuration * 0.34);
+    ctx.globalAlpha = panelAlpha * smoothstep(clamp((animationElapsed - nameStart) / Math.max(0.01, nameEnd - nameStart), 0, 1));
+  }
   ctx.fillText(character.name || 'Character', boxX + boxWidth / 2, boxY + 49, boxWidth - 56);
   ctx.textAlign = 'start';
+  if (sequentialReveal) ctx.globalAlpha = panelAlpha;
 
   const divider = ctx.createLinearGradient(boxX, 0, boxX + boxWidth, 0);
   divider.addColorStop(0, '#438cff');
@@ -376,11 +396,27 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
   ctx.stroke();
   ctx.shadowColor = 'transparent';
 
-  let rowY = boxY + 95;
+  const rowsTop = boxY + 95;
+  let rowY = rowsTop;
+  const rowsWindowStart = Math.min(0.4, animationDuration * 0.4);
+  const rowsWindow = Math.max(0.05, animationDuration - rowsWindowStart);
+  const rowStagger = rowsWindow / Math.max(character.details.length, 1) * 0.42;
+  const rowDuration = Math.max(0.05, rowsWindow - rowStagger * Math.max(0, character.details.length - 1));
   character.details.forEach((detail, index) => {
     const rowHeight = rowHeights[index];
     const rowX = boxX + 22;
     const rowWidth = boxWidth - 44;
+    let rowProgress = 1;
+    if (sequentialReveal) {
+      const rowStart = rowsWindowStart + index * rowStagger;
+      rowProgress = smoothstep(clamp((animationElapsed - rowStart) / rowDuration, 0, 1));
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rowX, rowY, rowWidth, rowHeight);
+      ctx.clip();
+      ctx.translate(0, -(1 - rowProgress) * (rowY - rowsTop + rowHeight * 0.85));
+      ctx.globalAlpha = panelAlpha * rowProgress;
+    }
     ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
     ctx.strokeStyle = 'rgba(139, 166, 208, 0.22)';
     ctx.lineWidth = 2;
@@ -403,6 +439,7 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
       const image = getImage(detail.image);
       if (image) drawCover(ctx, image, rowX + rowWidth - 102, rowY + 13, 80, 84);
     }
+    if (sequentialReveal) ctx.restore();
     rowY += rowHeight + 12;
   });
 
@@ -413,6 +450,7 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
   border.addColorStop(0.5, '#67e7ff');
   border.addColorStop(1, '#3976df');
   ctx.strokeStyle = border;
+  if (sequentialReveal) ctx.globalAlpha = panelAlpha;
   const borderProgress = animationStyle === 'draw' ? entranceProgress : 1;
   if (animationStyle === 'draw' && borderProgress < 1) {
     ctx.shadowColor = '#49caffaa';
@@ -459,7 +497,7 @@ export function drawScene(canvas, project, seconds) {
   ctx.fillRect(0, BASELINE, layout.width, 11);
   const highlight = project.settings.characterHighlight || 'none';
   project.characters.forEach((character, index) => drawCharacter(ctx, character, index === frame.activeIndex, highlight, frame.turnSeconds));
-  if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex], frame.detailBorderProgress, project.settings.detailAnimation);
+  if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex], frame.detailBorderProgress, project.settings.detailAnimation, frame.detailAnimationElapsed, frame.detailAnimationDuration);
 
   ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
   if (!project.characters.length) {
