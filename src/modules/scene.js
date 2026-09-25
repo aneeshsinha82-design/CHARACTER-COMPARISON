@@ -69,7 +69,7 @@ export function getTimelineDuration(project) {
 
 export function sampleTimeline(project, seconds) {
   const characters = project.characters;
-  if (!characters.length) return { camera: { x: SCENE_WIDTH / 2, y: SCENE_HEIGHT / 2, zoom: 1 }, activeIndex: -1, phase: 'empty', progress: 0 };
+  if (!characters.length) return { camera: { x: SCENE_WIDTH / 2, y: SCENE_HEIGHT / 2, zoom: 1 }, activeIndex: -1, phase: 'empty', progress: 0, detailBorderProgress: 0 };
 
   const hold = Number(project.settings.displayDuration) || 4;
   const transition = (Number(project.settings.transitionDuration) || 2) / (Number(project.settings.cameraSpeed) || 1);
@@ -79,7 +79,14 @@ export function sampleTimeline(project, seconds) {
   for (let index = 0; index < characters.length; index += 1) {
     const current = cameraTarget(characters[index], project.settings.zoomStrength);
     if (remaining <= hold || index === characters.length - 1) {
-      return { camera: current, activeIndex: index, phase: 'hold', progress: duration ? clamp(seconds / duration, 0, 1) : 0 };
+      const holdElapsed = hold - remaining;
+      return {
+        camera: current,
+        activeIndex: index,
+        phase: 'hold',
+        progress: duration ? clamp(seconds / duration, 0, 1) : 0,
+        detailBorderProgress: clamp(holdElapsed / 0.85, 0, 1),
+      };
     }
     remaining -= hold;
 
@@ -96,13 +103,14 @@ export function sampleTimeline(project, seconds) {
         activeIndex: index,
         phase: 'transition',
         progress: duration ? clamp(seconds / duration, 0, 1) : 0,
+        detailBorderProgress: 1,
       };
     }
     remaining -= transition;
   }
 
   const last = characters.length - 1;
-  return { camera: cameraTarget(characters[last], project.settings.zoomStrength), activeIndex: last, phase: 'hold', progress: 1 };
+  return { camera: cameraTarget(characters[last], project.settings.zoomStrength), activeIndex: last, phase: 'hold', progress: 1, detailBorderProgress: 1 };
 }
 
 function drawCover(ctx, image, x, y, width, height) {
@@ -146,7 +154,53 @@ function drawCharacter(ctx, character, isActive) {
   ctx.restore();
 }
 
-function drawDetailCard(ctx, character) {
+
+function traceRoundedRectReveal(ctx, x, y, width, height, radius, progress) {
+  const points = [{ x: x + radius, y }];
+  const addLine = (endX, endY) => points.push({ x: endX, y: endY });
+  const addArc = (centerX, centerY, startAngle, endAngle) => {
+    const steps = 16;
+    for (let step = 1; step <= steps; step += 1) {
+      const angle = startAngle + ((endAngle - startAngle) * step) / steps;
+      points.push({ x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius });
+    }
+  };
+
+  addLine(x + width - radius, y);
+  addArc(x + width - radius, y + radius, -Math.PI / 2, 0);
+  addLine(x + width, y + height - radius);
+  addArc(x + width - radius, y + height - radius, 0, Math.PI / 2);
+  addLine(x + radius, y + height);
+  addArc(x + radius, y + height - radius, Math.PI / 2, Math.PI);
+  addLine(x, y + radius);
+  addArc(x + radius, y + radius, Math.PI, Math.PI * 1.5);
+
+  const segments = [];
+  let perimeter = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1];
+    const to = points[index];
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+    segments.push({ from, to, length });
+    perimeter += length;
+  }
+
+  let remaining = perimeter * clamp(progress, 0, 1);
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (const segment of segments) {
+    if (remaining <= 0) break;
+    const amount = Math.min(1, remaining / segment.length);
+    ctx.lineTo(
+      segment.from.x + (segment.to.x - segment.from.x) * amount,
+      segment.from.y + (segment.to.y - segment.from.y) * amount,
+    );
+    remaining -= segment.length;
+  }
+  ctx.stroke();
+}
+
+function drawDetailCard(ctx, character, borderProgress = 1) {
   const boxWidth = 460;
   const rowHeights = character.details.map((detail) => detail.image ? 88 : 48);
   const boxHeight = 82 + rowHeights.reduce((sum, height) => sum + height, 0);
@@ -157,12 +211,9 @@ function drawDetailCard(ctx, character) {
   ctx.shadowBlur = 28;
   ctx.shadowOffsetY = 10;
   ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = '#dbe0eb';
-  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
   ctx.fill();
-  ctx.stroke();
   ctx.shadowColor = 'transparent';
   ctx.fillStyle = '#675ce4';
   ctx.beginPath();
@@ -197,6 +248,15 @@ function drawDetailCard(ctx, character) {
     }
     rowY += rowHeight;
   });
+
+  ctx.lineWidth = 4;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#8178f2';
+  if (borderProgress < 1) {
+    ctx.shadowColor = '#8178f277';
+    ctx.shadowBlur = 10;
+  }
+  traceRoundedRectReveal(ctx, boxX, boxY, boxWidth, boxHeight, 22, borderProgress);
   ctx.restore();
 }
 
@@ -236,7 +296,7 @@ export function drawScene(canvas, project, seconds) {
   ctx.fillStyle = '#17233a22';
   ctx.fillRect(0, BASELINE, layout.width, 11);
   project.characters.forEach((character, index) => drawCharacter(ctx, character, index === frame.activeIndex));
-  if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex]);
+  if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex], frame.detailBorderProgress);
 
   ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
   if (!project.characters.length) {
