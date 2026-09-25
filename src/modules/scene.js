@@ -88,9 +88,9 @@ export function sampleTimeline(project, seconds) {
       const amount = smoothstep(transition ? remaining / transition : 1);
       return {
         camera: {
-          x: next.x + (current.x - next.x) * amount,
-          y: next.y + (current.y - next.y) * amount,
-          zoom: next.zoom + (current.zoom - next.zoom) * amount,
+          x: current.x + (next.x - current.x) * amount,
+          y: current.y + (next.y - current.y) * amount,
+          zoom: current.zoom + (next.zoom - current.zoom) * amount,
         },
         activeIndex: remaining < transition * 0.5 ? index + 1 : index,
         phase: 'transition',
@@ -247,3 +247,4 @@ export function drawScene(canvas, project, seconds) {
   }
   return { ...frame, layout, duration: getTimelineDuration(project) };
 }
+
