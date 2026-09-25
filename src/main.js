@@ -1,5 +1,5 @@
 import { createCharacter, createImageAsset, releaseAsset } from './modules/characters.js';
-import { drawScene, getTimelineDuration } from './modules/scene.js?v=5';
+import { drawScene, getTimelineDuration } from './modules/scene.js?v=6';
 import { generateVideo } from './modules/video-export.js';
 
 const app = document.querySelector('#app');
@@ -13,6 +13,7 @@ const project = {
     zoomStrength: 0.62,
     characterSpacing: 1150,
     detailAnimation: 'draw',
+    characterHighlight: 'soft-glow',
   },
 };
 const playback = { currentTime: 0, playing: false, startAt: 0, frame: 0 };
@@ -63,6 +64,7 @@ app.innerHTML = `
             <label class="range-field"><span>Camera zoom <output id="zoom-strength-value">Balanced</output></span><input data-setting="zoomStrength" type="range" min="0.42" max="0.78" step="0.02" value="0.62"></label>
             <label class="range-field"><span>Character spacing <output id="spacing-value">1,150</output></span><input data-setting="characterSpacing" type="range" min="800" max="1800" step="50" value="1150"></label>
             <label class="select-field"><span>Detail entrance</span><select data-setting="detailAnimation"><option value="draw">Draw border</option><option value="fade">Fade in</option><option value="slide-up">Slide up</option><option value="rise-fade">Rise + fade</option><option value="zoom">Zoom in</option><option value="wipe">Top-down reveal</option><option value="spring">Spring pop</option><option value="slide-left">Slide from left</option></select></label>
+            <label class="select-field"><span>Character highlight</span><select data-setting="characterHighlight"><option value="none">None</option><option value="soft-glow">Soft glow</option><option value="cyan-aura">Cyan aura</option><option value="gold-aura">Gold aura</option><option value="spotlight">Spotlight</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="halo">Halo ring</option><option value="rays">Light rays</option><option value="sparkles">Sparkles</option><option value="shimmer">Moving shimmer</option><option value="color-pop">Color pop</option><option value="focus">Focus stage</option></select></label>
             <label class="select-field"><span>Video resolution</span><select id="export-resolution"><option value="1920x1080">1920 × 1080</option><option value="1280x720">1280 × 720</option></select></label>
             <label class="select-field"><span>Frame rate</span><select id="export-fps"><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label>
           </div>
@@ -432,7 +434,7 @@ app.addEventListener('click', (event) => {
 app.addEventListener('input', (event) => {
   const { setting, characterName, detailField, id, detailId } = event.target.dataset;
   if (setting) {
-    project.settings[setting] = setting === 'detailAnimation' ? event.target.value : Number(event.target.value);
+    project.settings[setting] = ['detailAnimation', 'characterHighlight'].includes(setting) ? event.target.value : Number(event.target.value);
     renderSettingsValues();
     renderScene();
     return;

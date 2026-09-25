@@ -75,7 +75,7 @@ export function getTimelineDuration(project) {
 
 export function sampleTimeline(project, seconds) {
   const characters = project.characters;
-  if (!characters.length) return { camera: { x: SCENE_WIDTH / 2, y: SCENE_HEIGHT / 2, zoom: 1 }, activeIndex: -1, phase: 'empty', progress: 0, detailBorderProgress: 0 };
+  if (!characters.length) return { camera: { x: SCENE_WIDTH / 2, y: SCENE_HEIGHT / 2, zoom: 1 }, activeIndex: -1, phase: 'empty', progress: 0, detailBorderProgress: 0, turnSeconds: 0 };
 
   const hold = Number(project.settings.displayDuration) || 4;
   const transition = (Number(project.settings.transitionDuration) || 2) / (Number(project.settings.cameraSpeed) || 1);
@@ -92,6 +92,7 @@ export function sampleTimeline(project, seconds) {
         phase: 'hold',
         progress: duration ? clamp(seconds / duration, 0, 1) : 0,
         detailBorderProgress: clamp(holdElapsed / 0.85, 0, 1),
+        turnSeconds: holdElapsed,
       };
     }
     remaining -= hold;
@@ -110,13 +111,14 @@ export function sampleTimeline(project, seconds) {
         phase: 'transition',
         progress: duration ? clamp(seconds / duration, 0, 1) : 0,
         detailBorderProgress: 1,
+        turnSeconds: hold,
       };
     }
     remaining -= transition;
   }
 
   const last = characters.length - 1;
-  return { camera: cameraTarget(characters[last], project.settings.zoomStrength), activeIndex: last, phase: 'hold', progress: 1, detailBorderProgress: 1 };
+  return { camera: cameraTarget(characters[last], project.settings.zoomStrength), activeIndex: last, phase: 'hold', progress: 1, detailBorderProgress: 1, turnSeconds: hold };
 }
 
 function drawCover(ctx, image, x, y, width, height) {
@@ -126,12 +128,113 @@ function drawCover(ctx, image, x, y, width, height) {
   ctx.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
-function drawCharacter(ctx, character, isActive) {
+function drawCharacterAura(ctx, character, innerColor, middleColor, radiusScale = 0.82) {
+  const { x } = character.position;
+  const { height } = character.renderedDimensions;
+  const centerY = BASELINE - height * 0.48;
+  const radius = height * radiusScale;
+  const gradient = ctx.createRadialGradient(x, centerY, 0, x, centerY, radius);
+  gradient.addColorStop(0, innerColor);
+  gradient.addColorStop(0.48, middleColor);
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(x - radius, centerY - radius, radius * 2, radius * 2);
+}
+
+function drawHighlightRays(ctx, character) {
+  const { x } = character.position;
+  const { height } = character.renderedDimensions;
+  const centerY = BASELINE - height * 0.82;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(143, 200, 255, 0.64)';
+  ctx.lineWidth = 7;
+  ctx.shadowColor = '#6fbaff';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (Math.PI * 2 * index) / 12;
+    const inner = height * 0.18;
+    const outer = height * (index % 2 ? 0.25 : 0.29);
+    ctx.moveTo(x + Math.cos(angle) * inner, centerY + Math.sin(angle) * inner);
+    ctx.lineTo(x + Math.cos(angle) * outer, centerY + Math.sin(angle) * outer);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHighlightSparkles(ctx, character, turnSeconds) {
+  const { x } = character.position;
+  const { width, height } = character.renderedDimensions;
+  const sparkles = [
+    [-0.42, 0.23, 15], [0.43, 0.18, 18], [-0.48, 0.43, 11], [0.49, 0.42, 12],
+    [-0.35, 0.58, 10], [0.38, 0.61, 14], [-0.19, 0.12, 10], [0.2, 0.1, 11],
+  ];
+  ctx.save();
+  sparkles.forEach(([offsetX, offsetY, size], index) => {
+    const flicker = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(turnSeconds * 5 + index * 1.7));
+    const sparkleX = x + width * offsetX;
+    const sparkleY = BASELINE - height * offsetY;
+    ctx.globalAlpha = flicker;
+    ctx.fillStyle = index % 2 ? '#ffe59a' : '#aeeeff';
+    ctx.beginPath();
+    ctx.moveTo(sparkleX, sparkleY - size);
+    ctx.quadraticCurveTo(sparkleX + 3, sparkleY - 3, sparkleX + size, sparkleY);
+    ctx.quadraticCurveTo(sparkleX + 3, sparkleY + 3, sparkleX, sparkleY + size);
+    ctx.quadraticCurveTo(sparkleX - 3, sparkleY + 3, sparkleX - size, sparkleY);
+    ctx.quadraticCurveTo(sparkleX - 3, sparkleY - 3, sparkleX, sparkleY - size);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawCharacter(ctx, character, isActive, highlightStyle = 'none', turnSeconds = 0) {
   const { x } = character.position;
   const { width, height } = character.renderedDimensions;
   const image = getImage(character.image);
   ctx.save();
-  ctx.globalAlpha = isActive ? 1 : 0.48;
+  ctx.globalAlpha = isActive ? 1 : highlightStyle === 'focus' ? 0.24 : 0.48;
+  if (isActive) {
+    if (highlightStyle === 'soft-glow') drawCharacterAura(ctx, character, 'rgba(156, 139, 255, 0.3)', 'rgba(115, 99, 242, 0.16)');
+    if (highlightStyle === 'cyan-aura') drawCharacterAura(ctx, character, 'rgba(100, 239, 255, 0.34)', 'rgba(41, 169, 255, 0.18)');
+    if (highlightStyle === 'gold-aura') drawCharacterAura(ctx, character, 'rgba(255, 221, 132, 0.34)', 'rgba(255, 166, 63, 0.18)');
+    if (highlightStyle === 'spotlight') drawCharacterAura(ctx, character, 'rgba(233, 244, 255, 0.38)', 'rgba(123, 170, 255, 0.15)', 1.12);
+    if (highlightStyle === 'halo') {
+      const ringScale = 1 + 0.04 * Math.sin(turnSeconds * 3.5);
+      ctx.save();
+      ctx.strokeStyle = '#62e4ff';
+      ctx.lineWidth = 8;
+      ctx.shadowColor = '#45cfff';
+      ctx.shadowBlur = 24;
+      ctx.beginPath();
+      ctx.ellipse(x, BASELINE - 10, width * 0.54 * ringScale, height * 0.045 * ringScale, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (highlightStyle === 'rays') drawHighlightRays(ctx, character);
+    if (highlightStyle === 'sparkles') drawHighlightSparkles(ctx, character, turnSeconds);
+    if (highlightStyle === 'shimmer') {
+      const sweepX = x + Math.sin(turnSeconds * 1.8) * width * 0.64;
+      const shimmer = ctx.createLinearGradient(sweepX - 34, 0, sweepX + 34, 0);
+      shimmer.addColorStop(0, 'rgba(102, 230, 255, 0)');
+      shimmer.addColorStop(0.5, 'rgba(125, 235, 255, 0.38)');
+      shimmer.addColorStop(1, 'rgba(102, 230, 255, 0)');
+      ctx.fillStyle = shimmer;
+      ctx.fillRect(sweepX - 34, BASELINE - height, 68, height);
+    }
+
+    let scale = 1;
+    let lift = 0;
+    if (highlightStyle === 'pulse') scale = 1 + 0.03 * (0.5 + 0.5 * Math.sin(turnSeconds * Math.PI * 2 / 1.35));
+    if (highlightStyle === 'bounce') lift = Math.abs(Math.sin(turnSeconds * Math.PI * 2 / 1.25)) * height * 0.025;
+    if (highlightStyle === 'bounce') ctx.translate(0, -lift);
+    if (highlightStyle === 'bounce') scale = 1 + lift / Math.max(height, 1) * 0.3;
+    if (scale !== 1) {
+      ctx.translate(x, BASELINE);
+      ctx.scale(scale, scale);
+      ctx.translate(-x, -BASELINE);
+    }
+    if (highlightStyle === 'color-pop' && 'filter' in ctx) ctx.filter = 'saturate(1.45) contrast(1.05)';
+  }
   if (image) {
     ctx.drawImage(image, x - width / 2, BASELINE - height, width, height);
   } else {
@@ -159,7 +262,6 @@ function drawCharacter(ctx, character, isActive) {
   }
   ctx.restore();
 }
-
 
 function traceRoundedRectReveal(ctx, x, y, width, height, radius, progress) {
   const points = [{ x: x + radius, y }];
@@ -355,7 +457,8 @@ export function drawScene(canvas, project, seconds) {
   );
   ctx.fillStyle = '#17233a22';
   ctx.fillRect(0, BASELINE, layout.width, 11);
-  project.characters.forEach((character, index) => drawCharacter(ctx, character, index === frame.activeIndex));
+  const highlight = project.settings.characterHighlight || 'none';
+  project.characters.forEach((character, index) => drawCharacter(ctx, character, index === frame.activeIndex, highlight, frame.turnSeconds));
   if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex], frame.detailBorderProgress, project.settings.detailAnimation);
 
   ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
