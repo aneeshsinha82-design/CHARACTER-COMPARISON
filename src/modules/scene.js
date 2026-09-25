@@ -74,7 +74,7 @@ export function getTimelineDuration(project) {
 }
 
 function detailEntranceDuration(character, settings, hold) {
-  if (settings.detailAnimation === 'name-then-slide') return Math.min(hold, Math.max(0.55, 0.5 + character.details.length * 0.15));
+  if (settings.detailAnimation === 'name-then-slide') return Math.min(hold, Math.max(0.62, 0.38 + character.details.length * 0.24));
   return 0.85;
 }
 
@@ -400,8 +400,8 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
   let rowY = rowsTop;
   const rowsWindowStart = Math.min(0.4, animationDuration * 0.4);
   const rowsWindow = Math.max(0.05, animationDuration - rowsWindowStart);
-  const rowStagger = rowsWindow / Math.max(character.details.length, 1) * 0.42;
-  const rowDuration = Math.max(0.05, rowsWindow - rowStagger * Math.max(0, character.details.length - 1));
+  const rowDuration = Math.min(0.26, rowsWindow * 0.75);
+  const rowStagger = character.details.length > 1 ? Math.max(0, (rowsWindow - rowDuration) / (character.details.length - 1)) : 0;
   character.details.forEach((detail, index) => {
     const rowHeight = rowHeights[index];
     const rowX = boxX + 22;
