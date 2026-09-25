@@ -19,8 +19,14 @@ function getImage(asset) {
   return image.complete && image.naturalWidth ? image : null;
 }
 
+function detailRowHeight(detail) {
+  return detail.image ? 110 : 72;
+}
+
 function detailBoxHeight(character) {
-  return 88 + character.details.reduce((height, detail) => height + (detail.image ? 92 : 48), 0);
+  const details = character.details;
+  if (!details.length) return 98;
+  return 115 + details.reduce((height, detail) => height + detailRowHeight(detail), 0) + (details.length - 1) * 12;
 }
 
 export function getSceneLayout(project) {
@@ -202,59 +208,84 @@ function traceRoundedRectReveal(ctx, x, y, width, height, radius, progress) {
 
 function drawDetailCard(ctx, character, borderProgress = 1) {
   const boxWidth = 460;
-  const rowHeights = character.details.map((detail) => detail.image ? 88 : 48);
-  const boxHeight = 82 + rowHeights.reduce((sum, height) => sum + height, 0);
+  const rowHeights = character.details.map(detailRowHeight);
+  const boxHeight = detailBoxHeight(character);
   const boxX = character.position.x - boxWidth / 2;
   const boxY = character.position.y - boxHeight - 48;
   ctx.save();
   ctx.shadowColor = '#07142c44';
   ctx.shadowBlur = 28;
   ctx.shadowOffsetY = 10;
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = 'rgba(8, 14, 29, 0.82)';
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
   ctx.fill();
+
   ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#675ce4';
+  ctx.fillStyle = 'rgba(32, 64, 112, 0.78)';
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxWidth, 78, [22, 22, 0, 0]);
   ctx.fill();
   ctx.fillStyle = '#ffffff';
   ctx.font = '700 31px system-ui, sans-serif';
-  ctx.fillText(character.name || 'Character', boxX + 28, boxY + 49, boxWidth - 56);
+  ctx.textAlign = 'center';
+  ctx.fillText(character.name || 'Character', boxX + boxWidth / 2, boxY + 49, boxWidth - 56);
+  ctx.textAlign = 'start';
 
-  let rowY = boxY + 82;
+  const divider = ctx.createLinearGradient(boxX, 0, boxX + boxWidth, 0);
+  divider.addColorStop(0, '#438cff');
+  divider.addColorStop(0.5, '#67e7ff');
+  divider.addColorStop(1, '#438cff');
+  ctx.strokeStyle = divider;
+  ctx.lineWidth = 4;
+  ctx.shadowColor = '#49caff';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.moveTo(boxX + 2, boxY + 78);
+  ctx.lineTo(boxX + boxWidth - 2, boxY + 78);
+  ctx.stroke();
+  ctx.shadowColor = 'transparent';
+
+  let rowY = boxY + 95;
   character.details.forEach((detail, index) => {
     const rowHeight = rowHeights[index];
-    if (index) {
-      ctx.strokeStyle = '#edf0f5';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(boxX + 20, rowY);
-      ctx.lineTo(boxX + boxWidth - 20, rowY);
-      ctx.stroke();
-    }
-    ctx.fillStyle = '#2a3347';
+    const rowX = boxX + 22;
+    const rowWidth = boxWidth - 44;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+    ctx.strokeStyle = 'rgba(139, 166, 208, 0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(rowX, rowY, rowWidth, rowHeight, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f3f6ff';
     ctx.font = '600 23px system-ui, sans-serif';
-    ctx.fillText(detail.label || `Detail ${index + 1}`, boxX + 28, rowY + 32, detail.image ? 260 : boxWidth - 56);
+    ctx.textAlign = detail.image ? 'start' : 'center';
+    ctx.fillText(detail.label || `Detail ${index + 1}`, detail.image ? rowX + 18 : boxX + boxWidth / 2, rowY + (detail.value ? 29 : rowHeight / 2 + 8), detail.image ? 250 : rowWidth - 28);
     if (detail.value) {
-      ctx.fillStyle = '#687188';
+      ctx.fillStyle = '#c7d7f2';
       ctx.font = '400 21px system-ui, sans-serif';
-      ctx.fillText(detail.value, boxX + 28, rowY + 58, detail.image ? 260 : boxWidth - 56);
+      ctx.fillText(detail.value, detail.image ? rowX + 18 : boxX + boxWidth / 2, rowY + 55, detail.image ? 250 : rowWidth - 28);
     }
+    ctx.textAlign = 'start';
     if (detail.image) {
       const image = getImage(detail.image);
-      if (image) drawCover(ctx, image, boxX + boxWidth - 112, rowY + 8, 82, 70);
+      if (image) drawCover(ctx, image, rowX + rowWidth - 102, rowY + 13, 80, 84);
     }
-    rowY += rowHeight;
+    rowY += rowHeight + 12;
   });
 
   ctx.lineWidth = 4;
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#8178f2';
+  const border = ctx.createLinearGradient(boxX, boxY, boxX + boxWidth, boxY + boxHeight);
+  border.addColorStop(0, '#3987ff');
+  border.addColorStop(0.5, '#67e7ff');
+  border.addColorStop(1, '#3976df');
+  ctx.strokeStyle = border;
   if (borderProgress < 1) {
-    ctx.shadowColor = '#8178f277';
-    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#49caffaa';
+    ctx.shadowBlur = 12;
   }
   traceRoundedRectReveal(ctx, boxX, boxY, boxWidth, boxHeight, 22, borderProgress);
   ctx.restore();
