@@ -85,12 +85,13 @@ export function sampleTimeline(project, seconds) {
 
     const next = cameraTarget(characters[index + 1], project.settings.zoomStrength);
     if (remaining < transition) {
-      const amount = smoothstep(transition ? remaining / transition : 1);
+      const linearAmount = transition ? clamp(remaining / transition, 0, 1) : 1;
+      const easedAmount = smoothstep(linearAmount);
       return {
         camera: {
-          x: current.x + (next.x - current.x) * amount,
-          y: current.y + (next.y - current.y) * amount,
-          zoom: current.zoom + (next.zoom - current.zoom) * amount,
+          x: current.x + (next.x - current.x) * linearAmount,
+          y: current.y + (next.y - current.y) * easedAmount,
+          zoom: current.zoom + (next.zoom - current.zoom) * easedAmount,
         },
         activeIndex: index,
         phase: 'transition',
@@ -247,4 +248,3 @@ export function drawScene(canvas, project, seconds) {
   }
   return { ...frame, layout, duration: getTimelineDuration(project) };
 }
-
