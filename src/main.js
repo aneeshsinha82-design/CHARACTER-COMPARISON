@@ -1,4 +1,3 @@
-import './style.css';
 import { createCharacter, isImageFile } from './modules/characters.js';
 import { renderCharacterGallery } from './modules/gallery.js';
 
@@ -125,3 +124,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 updateGallery();
+
