@@ -206,13 +206,41 @@ function traceRoundedRectReveal(ctx, x, y, width, height, radius, progress) {
   ctx.stroke();
 }
 
-function drawDetailCard(ctx, character, borderProgress = 1) {
+function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = 'draw') {
   const boxWidth = 460;
   const rowHeights = character.details.map(detailRowHeight);
   const boxHeight = detailBoxHeight(character);
   const boxX = character.position.x - boxWidth / 2;
   const boxY = character.position.y - boxHeight - 48;
   ctx.save();
+  const easedProgress = smoothstep(clamp(entranceProgress, 0, 1));
+  const centerX = boxX + boxWidth / 2;
+  const centerY = boxY + boxHeight / 2;
+  if (animationStyle === 'fade') {
+    ctx.globalAlpha *= easedProgress;
+  } else if (animationStyle === 'slide-up') {
+    ctx.translate(0, (1 - easedProgress) * 84);
+  } else if (animationStyle === 'rise-fade') {
+    ctx.globalAlpha *= easedProgress;
+    ctx.translate(0, (1 - easedProgress) * 46);
+  } else if (animationStyle === 'zoom') {
+    const scale = 0.78 + easedProgress * 0.22;
+    ctx.translate(centerX, centerY);
+    ctx.scale(scale, scale);
+    ctx.translate(-centerX, -centerY);
+  } else if (animationStyle === 'wipe') {
+    ctx.beginPath();
+    ctx.rect(boxX - 2, boxY - 2, boxWidth + 4, (boxHeight + 4) * easedProgress);
+    ctx.clip();
+  } else if (animationStyle === 'spring') {
+    const scale = 1 - 0.22 * Math.exp(-7 * easedProgress) * Math.cos(10 * easedProgress);
+    ctx.globalAlpha *= easedProgress;
+    ctx.translate(centerX, centerY);
+    ctx.scale(scale, scale);
+    ctx.translate(-centerX, -centerY);
+  } else if (animationStyle === 'slide-left') {
+    ctx.translate((1 - easedProgress) * -90, 0);
+  }
   ctx.shadowColor = '#07142c44';
   ctx.shadowBlur = 28;
   ctx.shadowOffsetY = 10;
@@ -283,7 +311,8 @@ function drawDetailCard(ctx, character, borderProgress = 1) {
   border.addColorStop(0.5, '#67e7ff');
   border.addColorStop(1, '#3976df');
   ctx.strokeStyle = border;
-  if (borderProgress < 1) {
+  const borderProgress = animationStyle === 'draw' ? entranceProgress : 1;
+  if (animationStyle === 'draw' && borderProgress < 1) {
     ctx.shadowColor = '#49caffaa';
     ctx.shadowBlur = 12;
   }
@@ -327,7 +356,7 @@ export function drawScene(canvas, project, seconds) {
   ctx.fillStyle = '#17233a22';
   ctx.fillRect(0, BASELINE, layout.width, 11);
   project.characters.forEach((character, index) => drawCharacter(ctx, character, index === frame.activeIndex));
-  if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex], frame.detailBorderProgress);
+  if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex], frame.detailBorderProgress, project.settings.detailAnimation);
 
   ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
   if (!project.characters.length) {
