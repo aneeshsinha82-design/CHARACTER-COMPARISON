@@ -84,7 +84,7 @@ export function sampleTimeline(project, seconds) {
     remaining -= hold;
 
     const next = cameraTarget(characters[index + 1], project.settings.zoomStrength);
-    if (remaining <= transition) {
+    if (remaining < transition) {
       const amount = smoothstep(transition ? remaining / transition : 1);
       return {
         camera: {
@@ -92,7 +92,7 @@ export function sampleTimeline(project, seconds) {
           y: current.y + (next.y - current.y) * amount,
           zoom: current.zoom + (next.zoom - current.zoom) * amount,
         },
-        activeIndex: remaining < transition * 0.5 ? index + 1 : index,
+        activeIndex: index,
         phase: 'transition',
         progress: duration ? clamp(seconds / duration, 0, 1) : 0,
       };
