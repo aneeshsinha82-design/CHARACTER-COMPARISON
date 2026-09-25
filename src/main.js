@@ -300,7 +300,8 @@ async function uploadCharacterImage(input) {
 }
 
 async function uploadDetailImage(input) {
-  const { characterId, detailId } = input.dataset;
+  const characterId = input.dataset.detailUpload;
+  const detailId = input.dataset.detailId;
   const file = input.files?.[0];
   if (!file) return;
   await useUploadedFile(file, (asset) => {
@@ -477,3 +478,4 @@ renderEditor();
 renderBackground();
 renderSettingsValues();
 renderScene();
+
