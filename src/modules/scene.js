@@ -91,7 +91,7 @@ export function sampleTimeline(project, seconds) {
     const current = cameraTarget(characters[index], project.settings.zoomStrength);
     const entranceDuration = detailEntranceDuration(characters[index], project.settings, hold);
     if (remaining <= hold || index === characters.length - 1) {
-      const holdElapsed = clamp(hold - remaining, 0, hold);
+      const holdElapsed = clamp(remaining, 0, hold);
       return {
         camera: current,
         activeIndex: index,
