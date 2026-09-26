@@ -326,59 +326,64 @@ function drawDetailCallouts(ctx, character, animationElapsed, animationDuration)
   const cardWidth = 360;
   const headX = character.position.x;
   const headY = character.position.y - character.renderedDimensions.height * 0.8;
+  const top = { x: headX - 100, y: headY - 300 };
+  const bottom = { x: headX + 42, y: headY + 34 };
   const startTime = 0.12;
   const sequenceWindow = Math.max(0.12, animationDuration - startTime);
   const step = sequenceWindow / details.length;
-  const lineColor = '#76d8ff';
 
-  details.forEach((detail, index) => {
+  const pointsFor = (detail, index) => {
     const cardHeight = detail.image ? 104 : 82;
     const side = index % 2 === 0 ? 1 : -1;
-    const cardX = headX + side * 330 - (side < 0 ? cardWidth : 0);
-    const cardY = headY - 220 + index * 104;
-    const anchorX = headX + side * 42;
-    const anchorY = headY + 22;
-    const elbowX = headX + side * 116;
-    const elbowY = cardY + cardHeight / 2;
+    const cardX = side > 0 ? headX + 270 : headX - 270 - cardWidth;
+    const cardY = headY - 300 + index * 72;
+    const centerY = cardY + cardHeight / 2;
+    const trunkT = clamp((centerY - top.y) / (bottom.y - top.y), 0, 1);
+    const junction = { x: top.x + (bottom.x - top.x) * trunkT, y: centerY };
     const edgeX = side > 0 ? cardX : cardX + cardWidth;
-    const points = [{ x: anchorX, y: anchorY }, { x: elbowX, y: elbowY }, { x: edgeX, y: elbowY }];
+    return { cardHeight, cardX, cardY, side, centerY, junction, edgeX };
+  };
+
+  ctx.save();
+  ctx.strokeStyle = '#76d8ff';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = '#42caff';
+  ctx.shadowBlur = 10;
+  const trunkProgress = smoothstep(clamp((animationElapsed - startTime * 0.45) / Math.max(0.12, animationDuration * 0.38), 0, 1));
+  const trunkEnd = {
+    x: bottom.x + (top.x - bottom.x) * trunkProgress,
+    y: bottom.y + (top.y - bottom.y) * trunkProgress,
+  };
+  ctx.beginPath();
+  ctx.moveTo(bottom.x, bottom.y);
+  ctx.lineTo(trunkEnd.x, trunkEnd.y);
+  ctx.stroke();
+  ctx.restore();
+
+  details.forEach((detail, index) => {
+    const layout = pointsFor(detail, index);
     const localStart = startTime + index * step;
     const itemDuration = Math.min(0.34, Math.max(0.16, step * 0.8));
     const progress = smoothstep(clamp((animationElapsed - localStart) / itemDuration, 0, 1));
+    const branchProgress = smoothstep(clamp((progress - 0.08) / 0.52, 0, 1));
 
     ctx.save();
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = lineColor;
+    ctx.strokeStyle = '#76d8ff';
     ctx.shadowColor = '#42caff';
     ctx.shadowBlur = 10;
-    let totalLength = 0;
-    const lengths = [];
-    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
-      const a = points[pointIndex - 1];
-      const b = points[pointIndex];
-      const length = Math.hypot(b.x - a.x, b.y - a.y);
-      lengths.push(length);
-      totalLength += length;
-    }
-    let remaining = totalLength * Math.min(1, progress / 0.56);
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
-      const a = points[pointIndex - 1];
-      const b = points[pointIndex];
-      const length = lengths[pointIndex - 1];
-      if (remaining <= 0) break;
-      const amount = Math.min(1, remaining / length);
-      ctx.lineTo(a.x + (b.x - a.x) * amount, a.y + (b.y - a.y) * amount);
-      remaining -= length;
-    }
+    ctx.moveTo(layout.junction.x, layout.junction.y);
+    ctx.lineTo(layout.junction.x + (layout.edgeX - layout.junction.x) * branchProgress, layout.centerY);
     ctx.stroke();
     ctx.restore();
 
-    const cardProgress = smoothstep(clamp((progress - 0.24) / 0.76, 0, 1));
+    const cardProgress = smoothstep(clamp((progress - 0.28) / 0.72, 0, 1));
     if (cardProgress <= 0) return;
+    const { cardHeight, cardX, cardY, side } = layout;
     ctx.save();
     ctx.globalAlpha *= cardProgress;
     ctx.translate((1 - cardProgress) * side * -22, (1 - cardProgress) * 8);
@@ -393,7 +398,7 @@ function drawDetailCallouts(ctx, character, animationElapsed, animationDuration)
     ctx.strokeStyle = 'rgba(107, 180, 255, 0.72)';
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.fillStyle = lineColor;
+    ctx.fillStyle = '#76d8ff';
     ctx.fillRect(side > 0 ? cardX : cardX + cardWidth - 5, cardY + 14, 5, cardHeight - 28);
     const imageSpace = detail.image ? 70 : 0;
     ctx.textAlign = 'start';
@@ -417,7 +422,6 @@ function drawDetailCallouts(ctx, character, animationElapsed, animationDuration)
     ctx.restore();
   });
 }
-
 function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = 'draw', animationElapsed = 0, animationDuration = 0.85) {
   if (animationStyle === 'callouts') {
     drawDetailCallouts(ctx, character, animationElapsed, animationDuration);
