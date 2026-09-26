@@ -1,5 +1,5 @@
 import { createCharacter, createImageAsset, releaseAsset } from './modules/characters.js';
-import { drawScene, getTimelineDuration } from './modules/scene.js?v=13';
+import { drawScene, getTimelineDuration, MOTION_GRAPHIC_PRESETS } from './modules/scene.js?v=14';
 import { generateVideo } from './modules/video-export.js';
 
 const app = document.querySelector('#app');
@@ -19,6 +19,12 @@ const project = {
 };
 const playback = { currentTime: 0, playing: false, startAt: 0, frame: 0 };
 const exportState = { generating: false, url: null, blob: null };
+const motionGraphicOptions = ['<option value="none">None</option>', ...[...new Set(MOTION_GRAPHIC_PRESETS.map((preset) => preset.family))].map((family) =>
+  `<optgroup label="${family}">${MOTION_GRAPHIC_PRESETS.filter((preset) => preset.family === family).map((preset) =>
+    `<option value="${preset.id}">${preset.family} · ${MOTION_GRAPHIC_PRESETS.find((item) => item.id === preset.id).palette.name}</option>`,
+  ).join('')}</optgroup>`,
+)].join('');
+
 
 app.innerHTML = `
   <div class="studio-app">
@@ -66,7 +72,7 @@ app.innerHTML = `
             <label class="range-field"><span>Character spacing <output id="spacing-value">1,150</output></span><input data-setting="characterSpacing" type="range" min="800" max="1800" step="50" value="1150"></label>
             <label class="select-field"><span>Detail entrance</span><select data-setting="detailAnimation"><option value="draw">Draw border</option><option value="fade">Fade in</option><option value="slide-up">Slide up</option><option value="rise-fade">Rise + fade</option><option value="zoom">Zoom in</option><option value="wipe">Top-down reveal</option><option value="spring">Spring pop</option><option value="slide-left">Slide from left</option><option value="name-then-slide">Name first, details slide down</option><option value="callouts">Connected callouts</option></select></label>
             <label class="select-field"><span>Character highlight</span><select data-setting="characterHighlight"><option value="none">None</option><option value="soft-glow">Soft glow</option><option value="cyan-aura">Cyan aura</option><option value="gold-aura">Gold aura</option><option value="spotlight">Spotlight</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="halo">Halo ring</option><option value="rays">Light rays</option><option value="sparkles">Sparkles</option><option value="shimmer">Moving shimmer</option><option value="color-pop">Color pop</option><option value="focus">Focus stage</option></select></label>
-            <label class="select-field"><span>Motion graphics</span><select data-setting="motionGraphics"><option value="none">None</option><option value="neon-orbit">Neon orbit</option><option value="energy-burst">Energy burst</option><option value="speed-lines">Speed lines</option><option value="holo-scan">Hologram scan</option><option value="particle-field">Particle field</option><option value="lens-flare">Lens flare</option><option value="spotlight-sweep">Spotlight sweep</option></select></label>
+            <label class="select-field"><span>Motion graphics <small>100 presets</small></span><select data-setting="motionGraphics">${motionGraphicOptions}</select></label>
             
             <label class="select-field"><span>Video resolution</span><select id="export-resolution"><option value="1920x1080">1920 × 1080</option><option value="1280x720">1280 × 720</option></select></label>
             <label class="select-field"><span>Frame rate</span><select id="export-fps"><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label>

@@ -3,6 +3,42 @@ export const SCENE_HEIGHT = 1080;
 const BASELINE = 875;
 const imageCache = new Map();
 
+const MOTION_GRAPHIC_FAMILIES = [
+  { name: 'Orbit Flow', effect: 'orbit' },
+  { name: 'Energy Burst', effect: 'burst' },
+  { name: 'Velocity Lines', effect: 'speed' },
+  { name: 'Hologram Scan', effect: 'scan' },
+  { name: 'Particle Field', effect: 'particles' },
+  { name: 'Lens Flare', effect: 'flare' },
+  { name: 'Spotlight Sweep', effect: 'spotlight' },
+  { name: 'Geometric Frame', effect: 'frame' },
+  { name: 'Comet Spiral', effect: 'comets' },
+  { name: 'Digital Rain', effect: 'rain' },
+];
+const MOTION_GRAPHIC_PALETTES = [
+  { name: 'Arctic Cyan', primary: '89, 225, 255', secondary: '123, 150, 255', glow: '#59dcff' },
+  { name: 'Electric Violet', primary: '167, 127, 255', secondary: '93, 185, 255', glow: '#9677ff' },
+  { name: 'Solar Gold', primary: '255, 210, 104', secondary: '255, 137, 83', glow: '#ffc45e' },
+  { name: 'Crimson Pulse', primary: '255, 105, 135', secondary: '255, 169, 92', glow: '#ff6486' },
+  { name: 'Emerald Flux', primary: '92, 244, 190', secondary: '98, 191, 255', glow: '#5cf4be' },
+  { name: 'Neon Magenta', primary: '255, 94, 222', secondary: '130, 114, 255', glow: '#ff5ede' },
+  { name: 'Ice Blue', primary: '195, 244, 255', secondary: '89, 172, 255', glow: '#b5f1ff' },
+  { name: 'Sunset Orange', primary: '255, 151, 88', secondary: '255, 92, 131', glow: '#ff9758' },
+  { name: 'Lime Matrix', primary: '190, 255, 87', secondary: '57, 221, 184', glow: '#c4ff58' },
+  { name: 'Starlight Silver', primary: '232, 241, 255', secondary: '150, 183, 255', glow: '#e8f1ff' },
+];
+export const MOTION_GRAPHIC_PRESETS = MOTION_GRAPHIC_FAMILIES.flatMap((family, familyIndex) =>
+  MOTION_GRAPHIC_PALETTES.map((palette, paletteIndex) => ({
+    id: `mg-${familyIndex + 1}-${paletteIndex + 1}`,
+    family: family.name,
+    effect: family.effect,
+    palette,
+    speed: 0.78 + paletteIndex * 0.055,
+    intensity: 0.78 + (paletteIndex % 5) * 0.08,
+  })),
+);
+
+
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const smoothstep = (value) => value * value * (3 - 2 * value);
 
@@ -216,79 +252,82 @@ function drawHighlightSparkles(ctx, character, turnSeconds) {
   ctx.restore();
 }
 
-function drawMotionGraphics(ctx, style, character, seconds) {
-  if (!style || style === 'none' || !character) return;
+function drawMotionGraphics(ctx, presetId, character, seconds) {
+  if (!presetId || presetId === 'none' || !character) return;
+  const preset = MOTION_GRAPHIC_PRESETS.find((item) => item.id === presetId);
+  if (!preset) return;
   const { x } = character.position;
   const height = character.renderedDimensions.height || 580;
   const centerY = BASELINE - height * 0.58;
-  const phase = seconds * Math.PI * 2;
+  const phase = seconds * Math.PI * 2 * preset.speed;
   const pulse = 0.5 + 0.5 * Math.sin(phase * 0.72);
+  const { effect, palette, intensity } = preset;
+  const colorA = (alpha) => `rgba(${palette.primary}, ${alpha * intensity})`;
+  const colorB = (alpha) => `rgba(${palette.secondary}, ${alpha * intensity})`;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  if (style === 'neon-orbit') {
+  if (effect === 'orbit') {
     ctx.translate(x, centerY);
     for (let index = 0; index < 3; index += 1) {
       ctx.save();
       ctx.rotate(phase * (index % 2 ? -0.035 : 0.035) + index * 0.72);
       ctx.beginPath();
       ctx.ellipse(0, 0, height * (0.58 + index * 0.13), height * (0.17 + index * 0.035), 0, 0, Math.PI * 2);
-      ctx.strokeStyle = index % 2 ? 'rgba(111, 227, 255, 0.62)' : 'rgba(147, 125, 255, 0.54)';
+      ctx.strokeStyle = index % 2 ? colorA(0.72) : colorB(0.68);
       ctx.lineWidth = 5;
-      ctx.shadowColor = index % 2 ? '#55ddff' : '#8c7bff';
+      ctx.shadowColor = palette.glow;
       ctx.shadowBlur = 18;
       ctx.setLineDash([110, 58]);
-      ctx.lineDashOffset = -seconds * 95;
+      ctx.lineDashOffset = -seconds * 95 * preset.speed;
       ctx.stroke();
       ctx.restore();
     }
-  } else if (style === 'energy-burst') {
+  } else if (effect === 'burst') {
     ctx.translate(x, centerY);
-    const rays = 24;
-    for (let index = 0; index < rays; index += 1) {
-      const angle = index / rays * Math.PI * 2 + phase * 0.035;
+    for (let index = 0; index < 24; index += 1) {
+      const angle = index / 24 * Math.PI * 2 + phase * 0.035;
       const inner = height * (0.62 + pulse * 0.035);
-      const outer = height * (0.75 + ((index % 3) * 0.05) + pulse * 0.05);
+      const outer = height * (0.75 + (index % 3) * 0.05 + pulse * 0.05);
       ctx.beginPath();
       ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
       ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
-      ctx.strokeStyle = index % 2 ? 'rgba(105, 222, 255, 0.68)' : 'rgba(166, 127, 255, 0.58)';
+      ctx.strokeStyle = index % 2 ? colorA(0.72) : colorB(0.66);
       ctx.lineWidth = index % 4 === 0 ? 7 : 4;
-      ctx.shadowColor = '#65cfff';
+      ctx.shadowColor = palette.glow;
       ctx.shadowBlur = 14;
       ctx.stroke();
     }
-  } else if (style === 'speed-lines') {
+  } else if (effect === 'speed') {
     const span = 1550;
-    const cycle = 520;
     ctx.lineWidth = 4;
     for (let index = 0; index < 22; index += 1) {
-      const baseX = x - span / 2 + (index * 173 + seconds * (330 + index % 4 * 90)) % span;
+      const baseX = x - span / 2 + (index * 173 + seconds * (330 + index % 4 * 90) * preset.speed) % span;
       const y = centerY - height * 0.62 + (index * 89) % Math.max(180, height * 1.18);
       const length = 80 + (index % 5) * 34;
       const gradient = ctx.createLinearGradient(baseX - length, y, baseX + length, y);
-      gradient.addColorStop(0, 'rgba(104, 200, 255, 0)');
-      gradient.addColorStop(0.5, 'rgba(123, 218, 255, 0.58)');
-      gradient.addColorStop(1, 'rgba(104, 200, 255, 0)');
+      gradient.addColorStop(0, colorA(0));
+      gradient.addColorStop(0.5, colorA(0.62));
+      gradient.addColorStop(1, colorA(0));
       ctx.strokeStyle = gradient;
       ctx.beginPath();
       ctx.moveTo(baseX - length, y);
       ctx.lineTo(baseX + length, y);
       ctx.stroke();
     }
-  } else if (style === 'holo-scan') {
-    const scanY = BASELINE - height + ((seconds * 260) % height);
+  } else if (effect === 'scan') {
+    const scanY = BASELINE - height + ((seconds * 260 * preset.speed) % height);
     const gradient = ctx.createLinearGradient(x - height * 0.65, scanY, x + height * 0.65, scanY);
-    gradient.addColorStop(0, 'rgba(57, 202, 255, 0)');
-    gradient.addColorStop(0.5, 'rgba(71, 218, 255, 0.5)');
-    gradient.addColorStop(1, 'rgba(57, 202, 255, 0)');
+    gradient.addColorStop(0, colorA(0));
+    gradient.addColorStop(0.5, colorA(0.5));
+    gradient.addColorStop(1, colorA(0));
     ctx.fillStyle = gradient;
-    ctx.shadowColor = '#4bdcff';
+    ctx.shadowColor = palette.glow;
     ctx.shadowBlur = 18;
     ctx.fillRect(x - height * 0.65, scanY - 4, height * 1.3, 8);
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(136, 230, 255, 0.14)';
+    ctx.strokeStyle = colorB(0.16);
     ctx.lineWidth = 2;
     for (let index = 0; index < 9; index += 1) {
       const y = BASELINE - height + index * height / 8;
@@ -297,7 +336,7 @@ function drawMotionGraphics(ctx, style, character, seconds) {
       ctx.lineTo(x + height * 0.5, y);
       ctx.stroke();
     }
-  } else if (style === 'particle-field') {
+  } else if (effect === 'particles') {
     for (let index = 0; index < 36; index += 1) {
       const angle = index * 2.399963 + phase * (index % 2 ? 0.045 : -0.035);
       const radius = height * (0.42 + (index % 7) * 0.075);
@@ -307,43 +346,100 @@ function drawMotionGraphics(ctx, style, character, seconds) {
       const size = 3 + (index % 4) + pulse * 2;
       ctx.beginPath();
       ctx.arc(px, py, size, 0, Math.PI * 2);
-      ctx.fillStyle = index % 3 ? 'rgba(112, 218, 255, 0.78)' : 'rgba(183, 151, 255, 0.82)';
-      ctx.shadowColor = '#73dfff';
+      ctx.fillStyle = index % 3 ? colorA(0.82) : colorB(0.86);
+      ctx.shadowColor = palette.glow;
       ctx.shadowBlur = 14;
       ctx.fill();
     }
-  } else if (style === 'lens-flare') {
+  } else if (effect === 'flare') {
     const flareX = x + Math.sin(phase * 0.3) * height * 0.32;
     const flareY = centerY - height * 0.12;
     const beam = ctx.createLinearGradient(x - height, flareY, x + height, flareY);
-    beam.addColorStop(0, 'rgba(113, 203, 255, 0)');
-    beam.addColorStop(0.48, 'rgba(128, 217, 255, 0.08)');
-    beam.addColorStop(0.5, 'rgba(198, 241, 255, 0.48)');
-    beam.addColorStop(0.52, 'rgba(128, 217, 255, 0.08)');
-    beam.addColorStop(1, 'rgba(113, 203, 255, 0)');
+    beam.addColorStop(0, colorA(0));
+    beam.addColorStop(0.48, colorA(0.12));
+    beam.addColorStop(0.5, colorA(0.62));
+    beam.addColorStop(0.52, colorA(0.12));
+    beam.addColorStop(1, colorA(0));
     ctx.fillStyle = beam;
     ctx.fillRect(x - height, flareY - 8, height * 2, 16);
     const glow = ctx.createRadialGradient(flareX, flareY, 0, flareX, flareY, height * 0.18);
-    glow.addColorStop(0, 'rgba(224, 249, 255, 0.7)');
-    glow.addColorStop(0.22, 'rgba(110, 217, 255, 0.28)');
-    glow.addColorStop(1, 'rgba(110, 217, 255, 0)');
+    glow.addColorStop(0, colorA(0.78));
+    glow.addColorStop(0.22, colorB(0.34));
+    glow.addColorStop(1, colorA(0));
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(flareX, flareY, height * 0.18, 0, Math.PI * 2);
     ctx.fill();
-  } else if (style === 'spotlight-sweep') {
+  } else if (effect === 'spotlight') {
     const sweepX = x + Math.sin(phase * 0.24) * height * 0.52;
     const gradient = ctx.createRadialGradient(sweepX, BASELINE - height * 0.68, 0, sweepX, BASELINE - height * 0.68, height * 1.1);
-    gradient.addColorStop(0, 'rgba(127, 211, 255, 0.24)');
-    gradient.addColorStop(0.42, 'rgba(114, 164, 255, 0.12)');
-    gradient.addColorStop(1, 'rgba(114, 164, 255, 0)');
+    gradient.addColorStop(0, colorA(0.26));
+    gradient.addColorStop(0.42, colorB(0.15));
+    gradient.addColorStop(1, colorA(0));
     ctx.fillStyle = gradient;
     ctx.fillRect(x - height * 1.15, BASELINE - height * 1.65, height * 2.3, height * 1.8);
+  } else if (effect === 'frame') {
+    const halfW = height * (0.48 + pulse * 0.025);
+    const top = BASELINE - height * 1.02;
+    const bottom = BASELINE - height * 0.02;
+    const corner = height * 0.2;
+    ctx.strokeStyle = colorA(0.82);
+    ctx.shadowColor = palette.glow;
+    ctx.shadowBlur = 16;
+    ctx.lineWidth = 7;
+    for (const side of [-1, 1]) {
+      for (const vertical of [top, bottom]) {
+        const px = x + side * halfW;
+        const py = vertical === top ? top : bottom;
+        ctx.beginPath();
+        ctx.moveTo(px - side * corner, py);
+        ctx.lineTo(px, py);
+        ctx.lineTo(px, py + (vertical === top ? corner : -corner));
+        ctx.stroke();
+      }
+    }
+  } else if (effect === 'comets') {
+    ctx.translate(x, centerY);
+    for (let index = 0; index < 5; index += 1) {
+      const angle = phase * (0.11 + index * 0.012) + index * Math.PI * 0.4;
+      const rx = height * (0.42 + index * 0.075);
+      const ry = height * (0.3 + index * 0.045);
+      const px = Math.cos(angle) * rx;
+      const py = Math.sin(angle) * ry;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, ry, angle * 0.15, angle, angle + 0.7);
+      ctx.strokeStyle = index % 2 ? colorA(0.62) : colorB(0.72);
+      ctx.lineWidth = 5 - index % 3;
+      ctx.shadowColor = palette.glow;
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(px, py, 8 + pulse * 4, 0, Math.PI * 2);
+      ctx.fillStyle = colorA(0.95);
+      ctx.fill();
+    }
+  } else if (effect === 'rain') {
+    const columns = 17;
+    for (let index = 0; index < columns; index += 1) {
+      const px = x - height * 0.72 + index * height * 1.44 / (columns - 1);
+      const trail = height * 0.42 + (index % 5) * height * 0.07;
+      const travel = (seconds * (190 + (index % 4) * 55) * preset.speed + index * 151) % (height * 1.35);
+      const py = BASELINE - height + travel;
+      const gradient = ctx.createLinearGradient(px, py - trail, px, py);
+      gradient.addColorStop(0, colorA(0));
+      gradient.addColorStop(1, colorA(0.8));
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = index % 3 === 0 ? 5 : 3;
+      ctx.shadowColor = palette.glow;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(px, py - trail);
+      ctx.lineTo(px, py);
+      ctx.stroke();
+    }
   }
-
   ctx.restore();
 }
-
 function drawCharacter(ctx, character, isActive, highlightStyle = 'none', turnSeconds = 0) {
   const { x } = character.position;
   const { width, height } = character.renderedDimensions;
