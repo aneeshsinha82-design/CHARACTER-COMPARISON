@@ -53,14 +53,31 @@ export function getSceneLayout(project) {
   };
 }
 
-function cameraTarget(character, zoomStrength) {
+function calloutBounds(character) {
   const height = character.renderedDimensions.height || 580;
-  const boxHeight = detailBoxHeight(character);
-  const top = character.position.y - boxHeight - 44;
-  const zoom = clamp((SCENE_HEIGHT * zoomStrength) / (BASELINE - top), 0.09, 3.2);
+  const headY = character.position.y + height * 0.1;
+  const count = character.details?.length || 0;
+  return {
+    top: headY - 300,
+    bottom: headY - 300 + Math.max(0, count - 1) * 72 + (count ? 104 : 0),
+  };
+}
+
+function cameraTarget(character, zoomStrength, detailAnimation = 'draw') {
+  let top;
+  let bottom = BASELINE;
+  if (detailAnimation === 'callouts' && character.details?.length) {
+    const bounds = calloutBounds(character);
+    top = bounds.top - 36;
+    bottom = Math.max(BASELINE, bounds.bottom + 42);
+  } else {
+    const boxHeight = detailBoxHeight(character);
+    top = character.position.y - boxHeight - 44;
+  }
+  const zoom = clamp((SCENE_HEIGHT * zoomStrength) / (bottom - top), 0.09, 3.2);
   return {
     x: character.position.x,
-    y: (top + BASELINE) / 2,
+    y: (top + bottom) / 2,
     zoom,
   };
 }
@@ -89,7 +106,7 @@ export function sampleTimeline(project, seconds) {
   let remaining = clamp(seconds, 0, duration);
 
   for (let index = 0; index < characters.length; index += 1) {
-    const current = cameraTarget(characters[index], project.settings.zoomStrength);
+    const current = cameraTarget(characters[index], project.settings.zoomStrength, project.settings.detailAnimation);
     const entranceDuration = detailEntranceDuration(characters[index], project.settings, hold);
     if (remaining <= hold || index === characters.length - 1) {
       const holdElapsed = clamp(remaining, 0, hold);
@@ -106,7 +123,7 @@ export function sampleTimeline(project, seconds) {
     }
     remaining -= hold;
 
-    const next = cameraTarget(characters[index + 1], project.settings.zoomStrength);
+    const next = cameraTarget(characters[index + 1], project.settings.zoomStrength, project.settings.detailAnimation);
     if (remaining < transition) {
       const linearAmount = transition ? clamp(remaining / transition, 0, 1) : 1;
       const easedAmount = smoothstep(linearAmount);
@@ -130,7 +147,7 @@ export function sampleTimeline(project, seconds) {
 
   const last = characters.length - 1;
   const entranceDuration = detailEntranceDuration(characters[last], project.settings, hold);
-  return { camera: cameraTarget(characters[last], project.settings.zoomStrength), activeIndex: last, phase: 'hold', progress: 1, detailBorderProgress: 1, detailAnimationElapsed: entranceDuration, detailAnimationDuration: entranceDuration, turnSeconds: hold };
+  return { camera: cameraTarget(characters[last], project.settings.zoomStrength, project.settings.detailAnimation), activeIndex: last, phase: 'hold', progress: 1, detailBorderProgress: 1, detailAnimationElapsed: entranceDuration, detailAnimationDuration: entranceDuration, turnSeconds: hold };
 }
 
 function drawCover(ctx, image, x, y, width, height) {
@@ -325,7 +342,7 @@ function drawDetailCallouts(ctx, character, animationElapsed, animationDuration)
   if (!details.length) return;
   const cardWidth = 360;
   const headX = character.position.x;
-  const headY = character.position.y - character.renderedDimensions.height * 0.8;
+  const headY = character.position.y + character.renderedDimensions.height * 0.1;
   const top = { x: headX - 100, y: headY - 300 };
   const bottom = { x: headX + 42, y: headY + 34 };
   const startTime = 0.12;
