@@ -216,6 +216,134 @@ function drawHighlightSparkles(ctx, character, turnSeconds) {
   ctx.restore();
 }
 
+function drawMotionGraphics(ctx, style, character, seconds) {
+  if (!style || style === 'none' || !character) return;
+  const { x } = character.position;
+  const height = character.renderedDimensions.height || 580;
+  const centerY = BASELINE - height * 0.58;
+  const phase = seconds * Math.PI * 2;
+  const pulse = 0.5 + 0.5 * Math.sin(phase * 0.72);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (style === 'neon-orbit') {
+    ctx.translate(x, centerY);
+    for (let index = 0; index < 3; index += 1) {
+      ctx.save();
+      ctx.rotate(phase * (index % 2 ? -0.035 : 0.035) + index * 0.72);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, height * (0.58 + index * 0.13), height * (0.17 + index * 0.035), 0, 0, Math.PI * 2);
+      ctx.strokeStyle = index % 2 ? 'rgba(111, 227, 255, 0.62)' : 'rgba(147, 125, 255, 0.54)';
+      ctx.lineWidth = 5;
+      ctx.shadowColor = index % 2 ? '#55ddff' : '#8c7bff';
+      ctx.shadowBlur = 18;
+      ctx.setLineDash([110, 58]);
+      ctx.lineDashOffset = -seconds * 95;
+      ctx.stroke();
+      ctx.restore();
+    }
+  } else if (style === 'energy-burst') {
+    ctx.translate(x, centerY);
+    const rays = 24;
+    for (let index = 0; index < rays; index += 1) {
+      const angle = index / rays * Math.PI * 2 + phase * 0.035;
+      const inner = height * (0.62 + pulse * 0.035);
+      const outer = height * (0.75 + ((index % 3) * 0.05) + pulse * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+      ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+      ctx.strokeStyle = index % 2 ? 'rgba(105, 222, 255, 0.68)' : 'rgba(166, 127, 255, 0.58)';
+      ctx.lineWidth = index % 4 === 0 ? 7 : 4;
+      ctx.shadowColor = '#65cfff';
+      ctx.shadowBlur = 14;
+      ctx.stroke();
+    }
+  } else if (style === 'speed-lines') {
+    const span = 1550;
+    const cycle = 520;
+    ctx.lineWidth = 4;
+    for (let index = 0; index < 22; index += 1) {
+      const baseX = x - span / 2 + (index * 173 + seconds * (330 + index % 4 * 90)) % span;
+      const y = centerY - height * 0.62 + (index * 89) % Math.max(180, height * 1.18);
+      const length = 80 + (index % 5) * 34;
+      const gradient = ctx.createLinearGradient(baseX - length, y, baseX + length, y);
+      gradient.addColorStop(0, 'rgba(104, 200, 255, 0)');
+      gradient.addColorStop(0.5, 'rgba(123, 218, 255, 0.58)');
+      gradient.addColorStop(1, 'rgba(104, 200, 255, 0)');
+      ctx.strokeStyle = gradient;
+      ctx.beginPath();
+      ctx.moveTo(baseX - length, y);
+      ctx.lineTo(baseX + length, y);
+      ctx.stroke();
+    }
+  } else if (style === 'holo-scan') {
+    const scanY = BASELINE - height + ((seconds * 260) % height);
+    const gradient = ctx.createLinearGradient(x - height * 0.65, scanY, x + height * 0.65, scanY);
+    gradient.addColorStop(0, 'rgba(57, 202, 255, 0)');
+    gradient.addColorStop(0.5, 'rgba(71, 218, 255, 0.5)');
+    gradient.addColorStop(1, 'rgba(57, 202, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.shadowColor = '#4bdcff';
+    ctx.shadowBlur = 18;
+    ctx.fillRect(x - height * 0.65, scanY - 4, height * 1.3, 8);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(136, 230, 255, 0.14)';
+    ctx.lineWidth = 2;
+    for (let index = 0; index < 9; index += 1) {
+      const y = BASELINE - height + index * height / 8;
+      ctx.beginPath();
+      ctx.moveTo(x - height * 0.5, y);
+      ctx.lineTo(x + height * 0.5, y);
+      ctx.stroke();
+    }
+  } else if (style === 'particle-field') {
+    for (let index = 0; index < 36; index += 1) {
+      const angle = index * 2.399963 + phase * (index % 2 ? 0.045 : -0.035);
+      const radius = height * (0.42 + (index % 7) * 0.075);
+      const drift = Math.sin(phase * 0.3 + index * 1.7) * height * 0.045;
+      const px = x + Math.cos(angle) * radius;
+      const py = centerY + Math.sin(angle) * radius * 0.72 + drift;
+      const size = 3 + (index % 4) + pulse * 2;
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fillStyle = index % 3 ? 'rgba(112, 218, 255, 0.78)' : 'rgba(183, 151, 255, 0.82)';
+      ctx.shadowColor = '#73dfff';
+      ctx.shadowBlur = 14;
+      ctx.fill();
+    }
+  } else if (style === 'lens-flare') {
+    const flareX = x + Math.sin(phase * 0.3) * height * 0.32;
+    const flareY = centerY - height * 0.12;
+    const beam = ctx.createLinearGradient(x - height, flareY, x + height, flareY);
+    beam.addColorStop(0, 'rgba(113, 203, 255, 0)');
+    beam.addColorStop(0.48, 'rgba(128, 217, 255, 0.08)');
+    beam.addColorStop(0.5, 'rgba(198, 241, 255, 0.48)');
+    beam.addColorStop(0.52, 'rgba(128, 217, 255, 0.08)');
+    beam.addColorStop(1, 'rgba(113, 203, 255, 0)');
+    ctx.fillStyle = beam;
+    ctx.fillRect(x - height, flareY - 8, height * 2, 16);
+    const glow = ctx.createRadialGradient(flareX, flareY, 0, flareX, flareY, height * 0.18);
+    glow.addColorStop(0, 'rgba(224, 249, 255, 0.7)');
+    glow.addColorStop(0.22, 'rgba(110, 217, 255, 0.28)');
+    glow.addColorStop(1, 'rgba(110, 217, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(flareX, flareY, height * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (style === 'spotlight-sweep') {
+    const sweepX = x + Math.sin(phase * 0.24) * height * 0.52;
+    const gradient = ctx.createRadialGradient(sweepX, BASELINE - height * 0.68, 0, sweepX, BASELINE - height * 0.68, height * 1.1);
+    gradient.addColorStop(0, 'rgba(127, 211, 255, 0.24)');
+    gradient.addColorStop(0.42, 'rgba(114, 164, 255, 0.12)');
+    gradient.addColorStop(1, 'rgba(114, 164, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x - height * 1.15, BASELINE - height * 1.65, height * 2.3, height * 1.8);
+  }
+
+  ctx.restore();
+}
+
 function drawCharacter(ctx, character, isActive, highlightStyle = 'none', turnSeconds = 0) {
   const { x } = character.position;
   const { width, height } = character.renderedDimensions;
@@ -620,6 +748,7 @@ export function drawScene(canvas, project, seconds) {
   ctx.fillStyle = '#17233a22';
   ctx.fillRect(0, BASELINE, layout.width, 11);
   const highlight = project.settings.characterHighlight || 'none';
+  if (frame.activeIndex >= 0) drawMotionGraphics(ctx, project.settings.motionGraphics, project.characters[frame.activeIndex], seconds);
   project.characters.forEach((character, index) => drawCharacter(ctx, character, index === frame.activeIndex, highlight, frame.turnSeconds));
   if (frame.activeIndex >= 0) drawDetailCard(ctx, project.characters[frame.activeIndex], frame.detailBorderProgress, project.settings.detailAnimation, frame.detailAnimationElapsed, frame.detailAnimationDuration);
 
