@@ -1,5 +1,5 @@
 import { createCharacter, createImageAsset, releaseAsset } from './modules/characters.js';
-import { drawScene, getTimelineDuration, MOTION_GRAPHIC_PRESETS } from './modules/scene.js?v=14';
+import { drawScene, getTimelineDuration, MOTION_GRAPHIC_PRESETS } from './modules/scene.js?v=15';
 import { generateVideo } from './modules/video-export.js';
 
 const app = document.querySelector('#app');

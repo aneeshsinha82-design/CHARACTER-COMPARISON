@@ -631,14 +631,16 @@ function drawDetailCallouts(ctx, character, animationElapsed, animationDuration)
     ctx.shadowColor = '#07142c88';
     ctx.shadowBlur = 22;
     ctx.shadowOffsetY = 8;
-    ctx.fillStyle = 'rgba(11, 20, 38, 0.82)';
+    ctx.fillStyle = 'rgba(11, 20, 38, 0.42)';
     ctx.beginPath();
     ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 17);
     ctx.fill();
     ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = 'rgba(107, 180, 255, 0.72)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.94)';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([8, 6]);
     ctx.stroke();
+    ctx.setLineDash([]);
     ctx.fillStyle = '#76d8ff';
     ctx.fillRect(side > 0 ? cardX : cardX + cardWidth - 5, cardY + 14, 5, cardHeight - 28);
     const imageSpace = detail.image ? 70 : 0;
@@ -708,13 +710,13 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
   ctx.shadowColor = '#07142c44';
   ctx.shadowBlur = 28;
   ctx.shadowOffsetY = 10;
-  ctx.fillStyle = 'rgba(8, 14, 29, 0.82)';
+  ctx.fillStyle = 'rgba(8, 14, 29, 0.44)';
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
   ctx.fill();
 
   ctx.shadowColor = 'transparent';
-  ctx.fillStyle = 'rgba(32, 64, 112, 0.78)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxWidth, 78, [22, 22, 0, 0]);
   ctx.fill();
@@ -731,9 +733,9 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
   if (sequentialReveal) ctx.globalAlpha = panelAlpha;
 
   const divider = ctx.createLinearGradient(boxX, 0, boxX + boxWidth, 0);
-  divider.addColorStop(0, '#438cff');
-  divider.addColorStop(0.5, '#67e7ff');
-  divider.addColorStop(1, '#438cff');
+  divider.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+  divider.addColorStop(0.5, 'rgba(255, 255, 255, 0.82)');
+  divider.addColorStop(1, 'rgba(255, 255, 255, 0.2)');
   ctx.strokeStyle = divider;
   ctx.lineWidth = 4;
   ctx.shadowColor = '#49caff';
@@ -766,7 +768,7 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
       ctx.globalAlpha = panelAlpha * rowProgress;
     }
     ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
-    ctx.strokeStyle = 'rgba(139, 166, 208, 0.22)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(rowX, rowY, rowWidth, rowHeight, 14);
@@ -793,11 +795,9 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
 
   ctx.lineWidth = 4;
   ctx.lineJoin = 'round';
+  ctx.setLineDash([9, 7]);
   const border = ctx.createLinearGradient(boxX, boxY, boxX + boxWidth, boxY + boxHeight);
-  border.addColorStop(0, '#3987ff');
-  border.addColorStop(0.5, '#67e7ff');
-  border.addColorStop(1, '#3976df');
-  ctx.strokeStyle = border;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.96)';
   if (sequentialReveal) ctx.globalAlpha = panelAlpha;
   const borderProgress = animationStyle === 'draw' ? entranceProgress : 1;
   if (animationStyle === 'draw' && borderProgress < 1) {
@@ -805,6 +805,7 @@ function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = '
     ctx.shadowBlur = 12;
   }
   traceRoundedRectReveal(ctx, boxX, boxY, boxWidth, boxHeight, 22, borderProgress);
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
