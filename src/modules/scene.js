@@ -75,6 +75,7 @@ export function getTimelineDuration(project) {
 
 function detailEntranceDuration(character, settings, hold) {
   if (settings.detailAnimation === 'name-then-slide') return Math.min(hold, Math.max(0.62, 0.38 + character.details.length * 0.24));
+  if (settings.detailAnimation === 'callouts') return Math.min(hold, Math.max(0.8, 0.3 + character.details.length * 0.2));
   return 0.85;
 }
 
@@ -319,7 +320,109 @@ function traceRoundedRectReveal(ctx, x, y, width, height, radius, progress) {
   ctx.stroke();
 }
 
+function drawDetailCallouts(ctx, character, animationElapsed, animationDuration) {
+  const details = character.details || [];
+  if (!details.length) return;
+  const cardWidth = 360;
+  const headX = character.position.x;
+  const headY = character.position.y - character.renderedDimensions.height * 0.8;
+  const startTime = 0.12;
+  const sequenceWindow = Math.max(0.12, animationDuration - startTime);
+  const step = sequenceWindow / details.length;
+  const lineColor = '#76d8ff';
+
+  details.forEach((detail, index) => {
+    const cardHeight = detail.image ? 104 : 82;
+    const side = index % 2 === 0 ? 1 : -1;
+    const cardX = headX + side * 330 - (side < 0 ? cardWidth : 0);
+    const cardY = headY - 220 + index * 104;
+    const anchorX = headX + side * 42;
+    const anchorY = headY + 22;
+    const elbowX = headX + side * 116;
+    const elbowY = cardY + cardHeight / 2;
+    const edgeX = side > 0 ? cardX : cardX + cardWidth;
+    const points = [{ x: anchorX, y: anchorY }, { x: elbowX, y: elbowY }, { x: edgeX, y: elbowY }];
+    const localStart = startTime + index * step;
+    const itemDuration = Math.min(0.34, Math.max(0.16, step * 0.8));
+    const progress = smoothstep(clamp((animationElapsed - localStart) / itemDuration, 0, 1));
+
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = lineColor;
+    ctx.shadowColor = '#42caff';
+    ctx.shadowBlur = 10;
+    let totalLength = 0;
+    const lengths = [];
+    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+      const a = points[pointIndex - 1];
+      const b = points[pointIndex];
+      const length = Math.hypot(b.x - a.x, b.y - a.y);
+      lengths.push(length);
+      totalLength += length;
+    }
+    let remaining = totalLength * Math.min(1, progress / 0.56);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+      const a = points[pointIndex - 1];
+      const b = points[pointIndex];
+      const length = lengths[pointIndex - 1];
+      if (remaining <= 0) break;
+      const amount = Math.min(1, remaining / length);
+      ctx.lineTo(a.x + (b.x - a.x) * amount, a.y + (b.y - a.y) * amount);
+      remaining -= length;
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    const cardProgress = smoothstep(clamp((progress - 0.24) / 0.76, 0, 1));
+    if (cardProgress <= 0) return;
+    ctx.save();
+    ctx.globalAlpha *= cardProgress;
+    ctx.translate((1 - cardProgress) * side * -22, (1 - cardProgress) * 8);
+    ctx.shadowColor = '#07142c88';
+    ctx.shadowBlur = 22;
+    ctx.shadowOffsetY = 8;
+    ctx.fillStyle = 'rgba(11, 20, 38, 0.82)';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 17);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(107, 180, 255, 0.72)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = lineColor;
+    ctx.fillRect(side > 0 ? cardX : cardX + cardWidth - 5, cardY + 14, 5, cardHeight - 28);
+    const imageSpace = detail.image ? 70 : 0;
+    ctx.textAlign = 'start';
+    ctx.fillStyle = '#f6f9ff';
+    ctx.font = '700 22px system-ui, sans-serif';
+    ctx.fillText(detail.label || `Detail ${index + 1}`, cardX + 22, cardY + (detail.value ? 34 : cardHeight / 2 + 8), cardWidth - imageSpace - 44);
+    if (detail.value) {
+      ctx.fillStyle = '#cad8ef';
+      ctx.font = '400 19px system-ui, sans-serif';
+      ctx.fillText(detail.value, cardX + 22, cardY + 62, cardWidth - imageSpace - 44);
+    }
+    if (detail.image) {
+      const image = getImage(detail.image);
+      if (image) {
+        const fit = Math.min(58 / image.naturalWidth, 72 / image.naturalHeight);
+        const width = image.naturalWidth * fit;
+        const height = image.naturalHeight * fit;
+        ctx.drawImage(image, cardX + cardWidth - width - 16, cardY + (cardHeight - height) / 2, width, height);
+      }
+    }
+    ctx.restore();
+  });
+}
+
 function drawDetailCard(ctx, character, entranceProgress = 1, animationStyle = 'draw', animationElapsed = 0, animationDuration = 0.85) {
+  if (animationStyle === 'callouts') {
+    drawDetailCallouts(ctx, character, animationElapsed, animationDuration);
+    return;
+  }
   const boxWidth = 460;
   const rowHeights = character.details.map(detailRowHeight);
   const boxHeight = detailBoxHeight(character);
